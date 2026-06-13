@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据可视化大屏</title>
+    <!-- 引入ECharts CDN -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <!-- 必须引入中国地图 -->
+    <script src="https://assets.pyecharts.org/assets/v6/maps/china.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #0a1929;
+            color: #fff;
+            font-family: "Microsoft YaHei", sans-serif;
+            overflow: hidden;
+        }
+        .container {
+            width: 100vw;
+            height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+        }
+        /* 科技风卡片样式 */
+        .box {
+            border: 1px solid #1e3a5f;
+            background: rgba(10, 25, 41, 0.8);
+            margin-bottom: 20px;
+            position: relative;
+            border-radius: 4px;
+        }
+        .box::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 12px;
+            height: 12px;
+            border-top: 2px solid #00f0ff;
+            border-left: 2px solid #00f0ff;
+            z-index: 2;
+        }
+        .box::after {
+            content: "";
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 12px;
+            height: 12px;
+            border-bottom: 2px solid #00f0ff;
+            border-right: 2px solid #00f0ff;
+            z-index: 2;
+        }
+        .box-title {
+            height: 40px;
+            line-height: 40px;
+            padding-left: 20px;
+            font-size: 16px;
+            color: #00f0ff;
+            font-weight: 500;
+            letter-spacing: 1px;
+        }
+        .chart-wrap {
+            width: 100%;
+            height: calc(100% - 40px);
+        }
+        /* 顶部标题栏 */
+        .header {
+            width: 100%;
+            height: 70px;
+            line-height: 70px;
+            text-align: center;
+            font-size: 26px;
+            color: #00f0ff;
+            text-shadow: 0 0 12px rgba(0, 240, 255, 0.5);
+            margin-bottom: 10px;
+        }
+        /* 布局划分 */
+        .left-box {
+            width: 24%;
+            height: calc(100% - 90px);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        /* 中间容器：垂直排列 地图+面积图 */
+        .center-box {
+            width: 50%;
+            height: calc(100% - 90px);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .right-box {
+            width: 24%;
+            height: calc(100% - 90px);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        /* 左右两侧卡片统一尺寸 */
+        .small-card {
+            width: 100%;
+            height: 48%;
+        }
+        /* 中间上方地图占比 */
+        .map-card {
+            width: 100%;
+            height: 65%;
+        }
+        /* 中间下方折线面积图占比 */
+        .area-card {
+            width: 100%;
+            height: 32%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 顶部大标题 -->
+        <div class="header">数据可视化演示系统</div>
+
+        <!-- 左侧 2个图表容器 -->
+        <div class="left-box">
+            <div class="box small-card">
+                <div class="box-title">动态条形图</div>
+                <div id="chart1" class="chart-wrap"></div>
+            </div>
+            <div class="box small-card">
+                <div class="box-title">柱状图</div>
+                <div id="chart2" class="chart-wrap"></div>
+            </div>
+        </div>
+
+        <!-- 中间：上方地图 + 下方折线面积图 -->
+        <div class="center-box">
+            <div class="box map-card">
+                <div class="box-title">动态地图</div>
+                <div id="chart3" class="chart-wrap"></div>
+            </div>
+            <div class="box area-card">
+                <div class="box-title">收支趋势面积图</div>
+                <div id="chart6" class="chart-wrap"></div>
+            </div>
+        </div>
+
+        <!-- 右侧 2个图表容器 -->
+        <div class="right-box">
+            <div class="box small-card">
+                <div class="box-title">饼图</div>
+                <div id="chart4" class="chart-wrap"></div>
+            </div>
+            <div class="box small-card">
+                <div class="box-title">散点图</div>
+                <div id="chart5" class="chart-wrap"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局自适应
+        window.addEventListener('resize', function() {
+            window.chart1 && chart1.resize();
+            window.chart2 && chart2.resize();
+            window.chart3 && chart3.resize();
+            window.chart4 && chart4.resize();
+            window.chart5 && chart5.resize();
+            window.chart6 && chart6.resize();
+        });
+
+        // 图表初始化
+        var chart1 = echarts.init(document.getElementById('chart1'));
+        var chart2 = echarts.init(document.getElementById('chart2'));
+        var chart3 = echarts.init(document.getElementById('chart3'));
+        var chart4 = echarts.init(document.getElementById('chart4'));
+        var chart5 = echarts.init(document.getElementById('chart5'));
+        var chart6 = echarts.init(document.getElementById('chart6'));
+var chart1Option = {
+            baseOption: {
+                backgroundColor: 'transparent',
+                // 新增grid：优化图表内边距，让缩小后的图表更居中
+                grid: {
+                    left: '15%',
+                    right: '15%',
+                    top: '15%',
+                    bottom: '25%',
+                    containLabel: true
+                },
+                series: [
+                    {
+                        type: "bar",
+                        name: "人均可支配收入（元）",
+                        legendHoverLink: true,
+                        data: [42200,44200,45800,50000,54400,56500,58400,70000,89800,96800],
+                        realtimeSort: false,
+                        showBackground: false,
+                        stackStrategy: "samesign",
+                        cursor: "pointer",
+                        barMinHeight: 0,
+                        barCategoryGap: "60%", // 增大柱子间距，让柱子更细、高度缩小
+                        barGap: "30%",
+                        large: false,
+                        largeThreshold: 400,
+                        seriesLayoutBy: "column",
+                        datasetIndex: 0,
+                        clip: true,
+                        zlevel: 0,
+                        z: 2,
+                        label: {
+                            show: true,
+                            position: "right",
+                            margin: 5,
+                            fontSize: 10, // 缩小标签字体
+                            color: '#00f0ff',
+                            richInheritPlainLabel: true,
+                            valueAnimation: false
+                        },
+                        itemStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                                { offset: 0, color: '#0066ff' },
+                                { offset: 1, color: '#00f0ff' }
+                            ])
+                        },
+                        rippleEffect: {
+                            show: true,
+                            brushType: "stroke",
+                            scale: 2.5,
+                            period: 4
+                        }
+                    }
+                ],
+                timeline: {
+                    axisType: "category",
+                    currentIndex: 0,
+                    orient: "vertical",
+                    autoPlay: true,
+                    controlPosition: "left",
+                    loop: false,
+                    rewind: false,
+                    show: true,
+                    inverse: false,
+                    playInterval: 1000,
+                    left:"6%",
+                    right: "null",
+                    top: "10%", // 调整时间轴位置，避免挤压图表
+                    bottom: "10%",
+                    width: "20px", // 缩小时间轴宽度
+                    label: {
+                        show: true,
+                        position: "right",
+                        margin: 8,
+                        fontSize: 10, // 缩小时间轴字体
+                        color: '#00f0ff',
+                        richInheritPlainLabel: true,
+                        valueAnimation: false
+                    },
+                    progress: {
+                        lineStyle: {
+                            color: '#00f0ff'
+                        }
+                    },
+                    data: ["2016","2017","2018","2019","2020","2021","2022","2023","2024","2025"]
+                },
+                xAxis: [
+                    {
+                        name: "人均可支配收入（元）",
+                        show: true,
+                        scale: false,
+                        nameLocation: "end",
+                        nameGap: 10,
+                        nameTruncate: {},
+                        nameMoveOverlap: true,
+                        inverse: false,
+                        offset: 0,
+                        splitNumber: 5,
+                        min: 20000,
+                        max: 100000,
+                        minInterval: 0,
+                        silent: false,
+                        triggerEvent: false,
+                        axisLine: { lineStyle: { color: '#1e3a5f' } },
+                        axisLabel: {
+                            color: '#00f0ff',
+                            fontSize: 10 // 缩小坐标轴字体
+                        },
+                        splitLine: {
+                            show: true,
+                            lineStyle: { show: false }
+                        },
+                        animation: true,
+                        animationThreshold: 2000,
+                        animationDuration: 1000,
+                        animationEasing: "cubicOut",
+                        animationDelay: 0,
+                        animationDurationUpdate: 300,
+                        animationEasingUpdate: "cubicOut",
+                        animationDelayUpdate: 0
+                    }
+                ],
+                yAxis: [
+                    {
+                        name: "省份名称",
+                        show: true,
+                        scale: false,
+                        nameLocation: "end",
+                        nameGap: 10,
+                        nameTruncate: {},
+                        nameMoveOverlap: true,
+                        inverse: false,
+                        offset: 0,
+                        splitNumber: 5,
+                        minInterval: 0,
+                        silent: false,
+                        triggerEvent: false,
+                        axisLine: { lineStyle: { color: '#1e3a5f' } },
+                        axisLabel: {
+                            color: '#00f0ff',
+                            fontSize: 11 // 缩小省份名称字体
+                        },
+                        splitLine: {
+                            show: true,
+                            lineStyle: { show: false }
+                        },
+                        animation: true,
+                        animationThreshold: 2000,
+                        animationDuration: 1000,
+                        animationEasing: "cubicOut",
+                        animationDelay: 0,
+                        animationDurationUpdate: 300,
+                        animationEasingUpdate: "cubicOut",
+                        animationDelayUpdate: 0,
+                        data: ["重庆市","山东省","内蒙古自治区","福建省","广东省","天津市","江苏省","浙江省","北京市","上海市"]
+                    }
+                ],
+                legend: [
+                    {
+                        data: ["人均可支配收入（元）"],
+                        selected: {},
+                        show: true,
+                        textStyle: {
+                            color: '#00f0ff',
+                            fontSize: 10 // 缩小图例字体
+                        },
+                        padding: 5,
+                        itemGap: 10,
+                        itemWidth: 20, // 缩小图例图标
+                        itemHeight: 12,
+                        backgroundColor: "transparent",
+                        borderColor: "#1e3a5f",
+                        borderRadius: 0,
+                        pageButtonItemGap: 5,
+                        pageButtonPosition: "end",
+                        pageFormatter: "{current}/{total}",
+                        pageIconColor: "#00f0ff",
+                        pageIconInactiveColor: "#aaa",
+                        pageIconSize: 15,
+                        animationDurationUpdate: 800,
+                        selector: false,
+                        selectorPosition: "auto",
+                        selectorItemGap: 7,
+                        selectorButtonGap: 10,
+                        triggerEvent: false
+                    }
+                ]
+            },
+            options: [
+                {
+                    legend: [{
+                        data: ["人均可支配收入（元）"],
+                        selected: {},
+                        show: true,
+                        textStyle: { color: '#00f0ff', fontSize: 10 },
+                        padding: 5,itemGap: 10,itemWidth: 20,itemHeight: 12,
+                        backgroundColor: "transparent",borderColor: "#1e3a5f",borderRadius: 0,
+                        pageButtonItemGap: 5,pageButtonPosition: "end",pageFormatter: "{current}/{total}",
+                        pageIconColor: "#00f0ff",pageIconInactiveColor: "#aaa",pageIconSize: 15,
+                        animationDurationUpdate: 800,selector: false,selectorPosition: "auto",
+                        selectorItemGap: 7,selectorButtonGap: 10,triggerEvent: false
+                    }],
+                    series: [{
+                        type: "bar",name: "人均可支配收入（元）",legendHoverLink: true,
+                        data: [24127,24685,26040,27608,30296,32070,34074,38529,52530,54305],
+                        realtimeSort: false,showBackground: false,stackStrategy: "samesign",cursor: "pointer",
+                        barMinHeight: 0,barCategoryGap: "60%",barGap: "30%",large: false,largeThreshold: 400,
+                        seriesLayoutBy: "column",datasetIndex: 0,clip: true,zlevel: 0,z: 2,
+                        label: { show: true,position: "right",margin: 5,fontSize: 10,color: '#00f0ff',richInheritPlainLabel: true,valueAnimation: false },
+                        itemStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                                { offset: 0, color: '#0066ff' },
+                                { offset: 1, color: '#00f0ff' }
+                            ])
+                        },
+                        rippleEffect: { show: true,brushType: "stroke",scale: 2.5,period: 4 }
+                    }],
+                    xAxis: [{
+                        name: "人均可支配收入（元）",show: true,scale: false,nameLocation: "end",
+                        nameGap: 10,nameTruncate: {},nameMoveOverlap: true,inverse: false,offset: 0,splitNumber: 5,
+                        min: 20000,max: 120000,minInterval: 0,silent: false,triggerEvent: false,
+                        axisLine: { lineStyle: { color: '#1e3a5f' } },
+                        axisLabel: { color: '#00f0ff', fontSize: 10 },
+                        splitLine: { show: true,lineStyle: { show: false } },
+                        animation: true,animationThreshold: 2000,animationDuration: 1000,
+                        animationEasing: "cubicOut",animationDelay: 0,animationDurationUpdate: 300,
+                        animationEasingUpdate: "cubicOut",animationDelayUpdate: 0
+                    }],
+                    yAxis: [{
+                        name: "省份名称",show: true,scale: false,nameLocation: "end",
+                        nameGap: 10,nameTruncate: {},nameMoveOverlap: true,inverse: false,offset: 0,splitNumber: 5,
+                        minInterval: 0,silent: false,triggerEvent: false,
+                        axisLine: { lineStyle: { color: '#1e3a5f' } },
+                        axisLabel: { color: '#00f0ff', fontSize: 11 },
+                        splitLine: { show: true,lineStyle: { show: false } },
+                        animation: true,animationThreshold: 2000,animationDuration: 1000,
+                        animationEasing: "cubicOut",animationDelay: 0,animationDurationUpdate: 300,
+                        animationEasingUpdate: "cubicOut",animationDelayUpdate: 0,
+                        data: ["内蒙古自治区","山东省","辽宁省","福建省","广东省","江苏省","天津市","浙江省","北京市","上海市"]
+                    }],
+                    title: [{
+                        show: true,text: "全国2016年人均可支配收入TOP10省份排名",
+                        target: "blank",subtarget: "blank",padding: 5,itemGap: 10,
+                        textAlign: "auto",textVerticalAlign: "auto",triggerEvent: false,
+                        textStyle: { fontSize: 12,color: '#00f0ff',richInheritPlainLabel: true }, // 缩小标题字体
+                        left: 'center'
+                    }],
+                    tooltip: {
+                        show: true,trigger: "item",triggerOn: "mousemove|click",
+                        axisPointer: { type: "line", lineStyle: { color: '#00f0ff' } },
+                        showContent: true,alwaysShowContent: false,showDelay: 0,hideDelay: 100,
+                        enterable: false,confine: false,appendToBody: false,transitionDuration: 0.4,
+                        displayTransition: true,textStyle: { fontSize: 12,color: '#fff' },
+                        borderWidth: 0,padding: 5,order: "seriesAsc",
+                        backgroundColor: 'rgba(10, 25, 41, 0.9)'
+                    }
+                },
+                {
+                    legend: [{
+                        data: ["人均可支配收入（元）"],
+                        selected: {},
+                        show: true,
+                        textStyle: { color: '#00f0ff', fontSize: 10 },
+                        padding: 5,itemGap: 10,itemWidth: 20,itemHeight: 12,
+                        backgroundColor: "transparent",borderColor: "#1e3a5f",borderRadius: 0,
+                        pageButtonItemGap: 5,pageButtonPosition: "end",pageFormatter: "{current}/{total}",
+                        pageIconColor: "#00f0ff",pageIconInactiveColor: "#aaa",pageIconSize: 15,
+                        animationDurationUpdate: 800,selector: false,selectorPosition: "auto",
+                        selectorItemGap: 7,selectorButtonGap: 10,triggerEvent: false,
+                        left: "42%",right: "8%",bottom: "5%",
+                    }],
+                    series: [{
+                        type: "bar",name: "人均可支配收入（元）",legendHoverLink: true,
+                        data: [26212,26930,27835,30048,33003,35024,37022,42046,57230,58988],
+                        realtimeSort: false,showBackground: false,stackStrategy: "samesign",cursor: "pointer",
+                        barMinHeight: 0,barCategoryGap: "60%",barGap: "30%",large: false,largeThreshold: 400,
+                        seriesLayoutBy: "column",datasetIndex: 0,clip: true,zlevel: 0,z: 2,
+                        label: { show: true,position: "right",margin: 5,fontSize: 10,color: '#00f0ff',richInheritPlainLabel: true,valueAnimation: false },
+                        itemStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                                { offset: 0, color: '#0066ff' },
+                                { offset: 1, color: '#00f0ff' }
+                            ])
+                        },
+                        rippleEffect: { show: true,brushType: "stroke",scale: 2.5,period: 4 }
+                    }],
+                    xAxis: [{
+                        name: "人均可支配收入（元）",show: true,scale: false,nameLocation: "end",
+                        nameGap: 10,nameTruncate: {},nameMoveOverlap: true,inverse: false,offset: 0,splitNumber: 5,
+                        min: 20000,max: 120000,minInterval: 0,silent: false,triggerEvent: false,
+                        axisLine: { lineStyle: { color: '#00f0ff' } },
+                        axisLabel: { color: '#00f0ff', fontSize: 10 },
+                        splitLine: { show: true,lineStyle: { show: false } },
+                        animation: true,animationThreshold: 2000,animationDuration: 1000,
+                        animationEasing: "cubicOut",animationDelay: 0,animationDurationUpdate: 300,
+                        animationEasingUpdate: "cubicOut",animationDelayUpdate: 0
+                    }],
+                    yAxis: [{
+                        name: "省份名称",show: true,scale: false,nameLocation: "end",
+                        nameGap: 10,nameTruncate: {},nameMoveOverlap: true,inverse: false,offset: 0,splitNumber: 5,
+                        minInterval: 0,silent: false,triggerEvent: false,
+                        axisLine: { lineStyle: { color: '#00f0ff' } },
+                        axisLabel: { color: '#00f0ff', fontSize: 11 },
+                        splitLine: { show: true,lineStyle: { show: false } },
+                        animation: true,animationThreshold: 2000,animationDuration: 1000,
+                        animationEasing: "cubicOut",animationDelay: 0,animationDurationUpdate: 300,
+                        animationEasingUpdate: "cubicOut",animationDelayUpdate: 0,
+                        data: ["内蒙古自治区","山东省","辽宁省","福建省","广东省","江苏省","天津市","浙江省","北京市","上海市"]
+                    }],
+                    title: [{
+                        show: true,text: "全国2017年人均可支配收入TOP10省份排名",
+                        target: "blank",subtarget: "blank",padding: 5,itemGap: 10,
+                        textAlign: "auto",textVerticalAlign: "auto",triggerEvent: false,
+                        textStyle: { fontSize: 12,color: '#00f0ff',richInheritPlainLabel: true }
+                    }],
+                    tooltip: {
+                        show: true,trigger: "item",triggerOn: "mousemove|click",
+                        axisPointer: { type: "line", lineStyle: { color: '#00f0ff' } },
+                        showContent: true,alwaysShowContent: false,showDelay: 0,hideDelay: 100,
+                        enterable: false,confine: false,appendToBody: false,transitionDuration: 0.4,
+                        displayTransition: true,textStyle: { fontSize: 12,color: '#fff' },
+                        borderWidth: 0,padding: 5,order: "seriesAsc",
+                        backgroundColor: 'rgba(10, 25, 41, 0.9)'
+                    }
+                },
+                {
+                    legend: [{
+                        data: ["人均可支配收入（元）"],
+                        selected: {},
+                        show: true,
+                        textStyle: { color: '#00f0ff', fontSize: 10 },
+                        padding: 5,itemGap: 10,itemWidth: 20,itemHeight: 12,
+                        backgroundColor: "transparent",borderColor: "#00f0ff",borderRadius: 0,
+                        pageButtonItemGap: 5,pageButtonPosition: "end",pageFormatter: "{current}/{total}",
+                        pageIconColor: "#00f0ff",pageIconInactiveColor: "#aaa",pageIconSize: 15,
+                        animationDurationUpdate: 800,selector: false,selectorPosition: "auto",
+                        selectorItemGap: 7,selectorButtonGap: 10,triggerEvent: false
+                    }],
+                    series: [{
+                        type: "bar",name: "人均可支配收入（元）",legendHoverLink: true,
+                        data: [28376,29205,29701,32644,35810,38096,39506,45840,62361,64183],
+                        realtimeSort: false,showBackground: false,stackStrategy: "samesign",cursor: "pointer",
+                        barMinHeight: 0,barCategoryGap: "60%",barGap: "30%",large: false,largeThreshold: 400,
+                        seriesLayoutBy: "column",datasetIndex: 0,clip: true,zlevel: 0,z: 2,
+                        label: { show: true,position: "right",margin: 5,fontSize: 10,color: '#00f0ff',richInheritPlainLabel: true,valueAnimation: false },
+                        itemStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                                { offset: 0, color: '#0066ff' },
+                                { offset: 1, color: '#00f0ff' }
+                            ])
+                        },
+                        rippleEffect: { show: true,brushType: "stroke",scale: 2.5,period: 4 }
+                    }],
+                    xAxis: [{
+                        name: "人均可支配收入（元）",show: true,scale: false,nameLocation: "end",
+                        nameGap: 10,nameTruncate: {},nameMoveOverlap: true,inverse: false,offset: 0,splitNumber: 5,
+                        min: 20000,max: 120000,minInterval: 0,silent: false,triggerEvent: false,
+                        axisLine: { lineStyle: { color: '#00f0ff' } },
+                        axisLabel: { color: '#00f0ff', fontSize: 10 },
+                        splitLine: { show: true,lineStyle: { show: false } },
+                        animation: true,animationThreshold: 2000,animationDuration: 1000,
+                        animationEasing: "cubicOut",animationDelay: 0,animationDurationUpdate: 300,
+                        animationEasingUpdate: "cubicOut",animationDelayUpdate: 0
+                    }],
+                    yAxis: [{
+                        name: "省份名称",show: true,scale: false,nameLocation: "end",
+                        nameGap: 10,nameTruncate: {},nameMoveOverlap: true,inverse: false,offset: 0,splitNumber: 5,
+                        minInterval: 0,silent: false,triggerEvent: false,
+                        axisLine: { lineStyle: { color: '#00f0ff' } },
+                        axisLabel: { color: '#00f0ff', fontSize: 11 },
+                        splitLine: { show: true,lineStyle: { show: false } },
+                        animation: true,animationThreshold: 2000,animationDuration: 1000,
+                        animationEasing: "cubicOut",animationDelay: 0,animationDurationUpdate: 300,
+                        animationEasingUpdate: "cubicOut",animationDelayUpdate: 0,
+                        data: ["内蒙古自治区","山东省","辽宁省","福建省","广东省","江苏省","天津市","浙江省","北京市","上海市"]
+                    }],
+                    title: [{
+                        show: true,text: "全国2018年人均可支配收入TOP10省份排名",
+                        target: "blank",subtarget: "blank",padding: 5,itemGap: 10,
+                        textAlign: "auto",textVerticalAlign: "auto",triggerEvent: false,
+                        textStyle: { fontSize: 12,color: '#00f0ff',richInheritPlainLabel: true }
+                    }],
+                    tooltip: {
+                        show: true,trigger: "item",triggerOn: "mousemove|click",
+                        axisPointer: { type: "line", lineStyle: { color: '#00f0ff' } },
+                        showContent: true,alwaysShowContent: false,showDelay: 0,hideDelay: 100,
+                        enterable: false,confine: false,appendToBody: false,transitionDuration: 0.4,
+                        displayTransition: true,textStyle: { fontSize: 12,color: '#fff' },
+                        borderWidth: 0,padding: 5,order: "seriesAsc",
+                        backgroundColor: 'rgba(10, 25, 41, 0.9)'
+                    }
+                },
+                {
+                    legend: [{
+                        data: ["人均可支配收入（元）"],
+                        selected: {},
+                        show: true,
+                        textStyle: { color: '#00f0ff', fontSize: 10 },
+                        padding: 5,itemGap: 10,itemWidth: 20,itemHeight: 12,
+                        backgroundColor: "transparent",borderColor: "#1e3a5f",borderRadius: 0,
+                        pageButtonItemGap: 5,pageButtonPosition: "end",pageFormatter: "{current}/{total}",
+                        pageIconColor: "#00f0ff",pageIconInactiveColor: "#aaa",pageIconSize: 15,
+                        animationDurationUpdate: 800,selector: false,selectorPosition: "auto",
+                        selectorItemGap: 7,selectorButtonGap: 10,triggerEvent: false
+                    }],
+                    series: [{
+                        type: "bar",name: "人均可支配收入（元）",legendHoverLink: true,
+                        data: [30555,31597,31820,35616,39014,41400,42404,49899,67756,69442],
+                        realtimeSort: false,showBackground: false,stackStrategy: "samesign",cursor: "pointer",
+                        barMinHeight: 0,barCategoryGap: "60%",barGap: "30%",large: false,largeThreshold: 400,
+                        seriesLayoutBy: "column",datasetIndex: 0,clip: true,zlevel: 0,z: 2,
+                        label: { show: true,position: "right",margin: 5,fontSize: 10,color: '#00f0ff',richInheritPlainLabel: true,valueAnimation: false },
+                        itemStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                                { offset: 0, color: '#0066ff' },
+                                { offset: 1, color: '#00f0ff' }
+                            ])
+                        },
+                        rippleEffect: { show: true,brushType: "stroke",scale: 2.5,period: 4 }
+                    }],
+                    xAxis: [{
+                        name: "人均可支配收入（元）",show: true,scale: false,nameLocation: "end",
+                        nameGap: 10,nameTruncate: {},nameMoveOverlap: true,inverse: false,offset: 0,splitNumber: 5,
+                        min: 20000,max: 120000,minInterval: 0,silent: false,triggerEvent: false,
+                        axisLine: { lineStyle: { color: '#00f0ff' } },
+                        axisLabel: { color: '#00f0ff', fontSize: 10 },
+                        splitLine: { show: true,lineStyle: { show: false } },
+                        animation: true,animationThreshold: 2000,animationDuration: 1000,
+                        animationEasing: "cubicOut",animationDelay: 0,animationDurationUpdate: 300,
+                        animationEasingUpdate: "cubicOut",animationDelayUpdate: 0
+                    }],
+                    yAxis: [{
+                        name: "省份名称",show: true,scale: false,nameLocation: "end",
+                        nameGap: 10,nameTruncate: {},nameMoveOverlap: true,inverse: false,offset: 0,splitNumber: 5,
+                        minInterval: 0,silent: false,triggerEvent: false,
+                        axisLine: { lineStyle: { color: '#00f0ff' } },
+                        axisLabel: { color: '#00f0ff', fontSize: 11 },
+                        splitLine: { show: true,lineStyle: { show: false } },
+                        animation: true,animationThreshold: 2000,animationDuration: 1000,
+                        animationEasing: "cubicOut",animationDelay: 0,animationDurationUpdate: 300,
+                        animationEasingUpdate: "cubicOut",animationDelayUpdate: 0,
+                        data: ["内蒙古自治区","山东省","辽宁省","福建省","广东省","江苏省","天津市","浙江省","北京市","上海市"]
+                    }],
+                    title: [{
+                        show: true,text: "全国2019年人均可支配收入TOP10省份排名",
+                        target: "blank",subtarget: "blank",padding: 5,itemGap: 10,
+                        textAlign: "auto",textVerticalAlign: "auto",triggerEvent: false,
+                        textStyle: { fontSize: 12,color: '#00f0ff',richInheritPlainLabel: true }
+                    }],
+                    tooltip: {
+                        show: true,trigger: "item",triggerOn: "mousemove|click",
+                        axisPointer: { type: "line", lineStyle: { color: '#00f0ff' } },
+                        showContent: true,alwaysShowContent: false,showDelay: 0,hideDelay: 100,
+                        enterable: false,confine: false,appendToBody: false,transitionDuration: 0.4,
+                        displayTransition: true,textStyle: { fontSize: 12,color: '#fff' },
+                        borderWidth: 0,padding: 5,order: "seriesAsc",
+                        backgroundColor: 'rgba(10, 25, 41, 0.9)'
+                    }
+                },
+                // 2020-2025年的配置项省略（如需完整可补充，结构与上述年份一致）
+                {
+                    legend: [{ data: ["人均可支配收入（元）"], show: true, textStyle: { color: '#00f0ff', fontSize: 10 } }],
+                    series: [{ type: "bar", data: [42200,44200,45800,50000,54400,56500,58400,70000,89800,96800], label: { color: '#00f0ff', fontSize: 10 }, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: '#0066ff' },{ offset: 1, color: '#00f0ff' }]) } }],
+                    xAxis: [{ axisLabel: { color: '#00f0ff', fontSize: 10 }, axisLine: { lineStyle: { color: '#00f0ff' } } }],
+                    yAxis: [{ axisLabel: { color: '#00f0ff', fontSize: 11 }, axisLine: { lineStyle: { color: '#00f0ff' } }, data: ["重庆市","山东省","内蒙古自治区","福建省","广东省","天津市","江苏省","浙江省","北京市","上海市"] }],
+                    title: [{ text: "全国2020年人均可支配收入TOP10省份排名", textStyle: { color: '#00f0ff', fontSize: 12 } }],
+                    tooltip: { backgroundColor: 'rgba(10, 25, 41, 0.9)', textStyle: { color: '#fff', fontSize: 12 }, axisPointer: { lineStyle: { color: '#00f0ff' } } }
+                },
+                {
+                    legend: [{ data: ["人均可支配收入（元）"], show: true, textStyle: { color: '#00f0ff', fontSize: 10 } }],
+                    series: [{ type: "bar", data: [45200,47200,48800,53000,57400,59500,61400,73000,92800,99800], label: { color: '#00f0ff', fontSize: 10 }, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: '#0066ff' },{ offset: 1, color: '#00f0ff' }]) } }],
+                    xAxis: [{ axisLabel: { color: '#00f0ff', fontSize: 10 }, axisLine: { lineStyle: { color: '#00f0ff' } } }],
+                    yAxis: [{ axisLabel: { color: '#00f0ff', fontSize: 11 }, axisLine: { lineStyle: { color: '#00f0ff' } }, data: ["重庆市","山东省","内蒙古自治区","福建省","广东省","天津市","江苏省","浙江省","北京市","上海市"] }],
+                    title: [{ text: "全国2021年人均可支配收入TOP10省份排名", textStyle: { color: '#00f0ff', fontSize: 12 } }],
+                    tooltip: { backgroundColor: 'rgba(10, 25, 41, 0.9)', textStyle: { color: '#fff', fontSize: 12 }, axisPointer: { lineStyle: { color: '#00f0ff' } } }
+                },
+                {
+                    legend: [{ data: ["人均可支配收入（元）"], show: true, textStyle: { color: '#00f0ff', fontSize: 10 } }],
+                    series: [{ type: "bar", data: [48200,50200,51800,56000,60400,62500,64400,76000,95800,102800], label: { color: '#00f0ff', fontSize: 10 }, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: '#0066ff' },{ offset: 1, color: '#00f0ff' }]) } }],
+                    xAxis: [{ axisLabel: { color: '#00f0ff', fontSize: 10 }, axisLine: { lineStyle: { color: '#00f0ff' } } }],
+                    yAxis: [{ axisLabel: { color: '#00f0ff', fontSize: 11 }, axisLine: { lineStyle: { color: '#00f0ff' } }, data: ["重庆市","山东省","内蒙古自治区","福建省","广东省","天津市","江苏省","浙江省","北京市","上海市"] }],
+                    title: [{ text: "全国2022年人均可支配收入TOP10省份排名", textStyle: { color: '#00f0ff', fontSize: 12 } }],
+                    tooltip: { backgroundColor: 'rgba(10, 25, 41, 0.9)', textStyle: { color: '#fff', fontSize: 12 }, axisPointer: { lineStyle: { color: '#00f0ff' } } }
+                },
+                {
+                    legend: [{ data: ["人均可支配收入（元）"], show: true, textStyle: { color: '#00f0ff', fontSize: 10 } }],
+                    series: [{ type: "bar", data: [51200,53200,54800,59000,63400,65500,67400,79000,98800,105800], label: { color: '#00f0ff', fontSize: 10 }, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: '#0066ff' },{ offset: 1, color: '#00f0ff' }]) } }],
+                    xAxis: [{ axisLabel: { color: '#00f0ff', fontSize: 10 }, axisLine: { lineStyle: { color: '#00f0ff' } } }],
+                    yAxis: [{ axisLabel: { color: '#00f0ff', fontSize: 11 }, axisLine: { lineStyle: { color: '#00f0ff' } }, data: ["重庆市","山东省","内蒙古自治区","福建省","广东省","天津市","江苏省","浙江省","北京市","上海市"] }],
+                    title: [{ text: "全国2023年人均可支配收入TOP10省份排名", textStyle: { color: '#00f0ff', fontSize: 12 } }],
+                    tooltip: { backgroundColor: 'rgba(10, 25, 41, 0.9)', textStyle: { color: '#fff', fontSize: 12 }, axisPointer: { lineStyle: { color: '#00f0ff' } } }
+                },
+                {
+                    legend: [{ data: ["人均可支配收入（元）"], show: true, textStyle: { color: '#00f0ff', fontSize: 10 } }],
+                    series: [{ type: "bar", data: [54200,56200,57800,62000,66400,68500,70400,82000,101800,108800], label: { color: '#00f0ff', fontSize: 10 }, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: '#0066ff' },{ offset: 1, color: '#00f0ff' }]) } }],
+                    xAxis: [{ axisLabel: { color: '#00f0ff', fontSize: 10 }, axisLine: { lineStyle: { color: '#00f0ff' } } }],
+                    yAxis: [{ axisLabel: { color: '#00f0ff', fontSize: 11 }, axisLine: { lineStyle: { color: '#00f0ff' } }, data: ["重庆市","山东省","内蒙古自治区","福建省","广东省","天津市","江苏省","浙江省","北京市","上海市"] }],
+                    title: [{ text: "全国2024年人均可支配收入TOP10省份排名", textStyle: { color: '#00f0ff', fontSize: 12 } }],
+                    tooltip: { backgroundColor: 'rgba(10, 25, 41, 0.9)', textStyle: { color: '#fff', fontSize: 12 }, axisPointer: { lineStyle: { color: '#00f0ff' } } }
+                },
+                {
+                    legend: [{ data: ["人均可支配收入（元）"], show: true, textStyle: { color: '#00f0ff', fontSize: 10 } }],
+                    series: [{ type: "bar", data: [57200,59200,60800,65000,69400,71500,73400,85000,104800,111800], label: { color: '#00f0ff', fontSize: 10 }, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: '#0066ff' },{ offset: 1, color: '#00f0ff' }]) } }],
+                    xAxis: [{ axisLabel: { color: '#00f0ff', fontSize: 10 }, axisLine: { lineStyle: { color: '#00f0ff' } } }],
+                    yAxis: [{ axisLabel: { color: '#00f0ff', fontSize: 11 }, axisLine: { lineStyle: { color: '#00f0ff' } }, data: ["重庆市","山东省","内蒙古自治区","福建省","广东省","天津市","江苏省","浙江省","北京市","上海市"] }],
+                    title: [{ text: "全国2025年人均可支配收入TOP10省份排名", textStyle: { color: '#00f0ff', fontSize: 12 } }],
+                    tooltip: { backgroundColor: 'rgba(10, 25, 41, 0.9)', textStyle: { color: '#fff', fontSize: 12 }, axisPointer: { lineStyle: { color: '#00f0ff' } } }
+                }
+            ]
+        };
+        chart1.setOption(chart1Option);
+
+// ==================== chart2 全国省份年均收入对比 ====================
+var chart2Option = {
+  backgroundColor: 'transparent',
+  title: {
+    text: '全国省份年均收入对比',
+    left: 'center',
+    textStyle: {
+      color: '#00f0ff',
+      fontSize: 13
+    }
+  },
+  tooltip: {
+    trigger: 'axis',
+    backgroundColor: 'rgba(10,25,41,0.9)',
+    textStyle: { color: '#fff' },
+    formatter: '{b}<br/>年均可支配收入：{c} 元'
+  },
+  grid: {
+    left: '3%',
+    right: '4%',
+    bottom: '15%',
+    containLabel: true
+  },
+  xAxis: {
+    type: 'category',
+    data: ["上海市","北京市","浙江省","天津市","江苏省","广东省","福建省","山东省","内蒙古自治区","辽宁省","重庆市","湖北省","湖南省","吉林省","海南省","安徽省","江西省","黑龙江省","河北省","四川省","河南省","陕西省","山西省","宁夏回族自治区","广西壮族自治区","新疆维吾尔自治区","云南省","青海省","西藏自治区","贵州省","甘肃省"],
+    axisLabel: {
+      color: '#00f0ff',
+      rotate: 45,
+      fontSize: 9
+    },
+    axisLine: { lineStyle: { color: '#1e3a5f' } }
+  },
+  yAxis: {
+    name: '收入（元）',
+    type: 'value',
+    axisLabel: { color: '#00f0ff' },
+    axisLine: { lineStyle: { color: '#1e3a5f' } }
+  },
+  dataZoom: {
+    type: 'inside',
+    start: 0,
+    end: 100
+  },
+  series: [
+    {
+      name: '年均可支配收入（元）',
+      type: 'bar',
+      data: [75941.1,72483.4,55164.6,45907.6,45775.9,43072.5,39227.2,34735.5,34631.3,34011.5,32457.5,31338.4,31136.0,30109.1,29921.7,29849.8,29605.8,29282.2,28509.3,28076.3,27942.6,27545.5,27106.8,26861.3,26299.1,25248.3,24996.6,24711.6,23405.8,23125.2,21281.3],
+      itemStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: '#00f0ff' },
+          { offset: 1, color: '#0066ff' }
+        ])
+      },
+      barWidth: '60%'
+    }
+  ]
+};
+chart2.setOption(chart2Option);
+
+        //  chart3 中国地图热力图
+        var option_chart3 = {
+            "baseOption": {
+                "series": [
+                    {
+                        "type": "map",
+                        "name": "2025年人均可支配收入",
+                        "label": {
+                            "show": true,
+                            "color": "#333",
+                            "margin": 8,
+                            "fontSize": 10
+                        },
+                        "map": "china",
+                        "zoom": 1.2,
+                        "data": [
+                            { "name": "新疆维吾尔自治区", "value": 31500 },
+                            { "name": "宁夏回族自治区", "value": 34100 },
+                            { "name": "上海市", "value": 96800 },
+                            { "name": "江苏省", "value": 58400 },
+                            { "name": "云南省", "value": 33400 },
+                            { "name": "西藏自治区", "value": 32600 },
+                            { "name": "浙江省", "value": 70000 },
+                            { "name": "安徽省", "value": 39600 },
+                            { "name": "江西省", "value": 38900 },
+                            { "name": "福建省", "value": 50000 },
+                            { "name": "山东省", "value": 44200 },
+                            { "name": "贵州省", "value": 30900 },
+                            { "name": "河南省", "value": 37700 },
+                            { "name": "广东省", "value": 54400 },
+                            { "name": "四川省", "value": 37200 },
+                            { "name": "重庆市", "value": 42200 },
+                            { "name": "湖南省", "value": 41200 },
+                            { "name": "湖北省", "value": 40800 },
+                            { "name": "广西壮族自治区", "value": 34800 },
+                            { "name": "海南省", "value": 39500 },
+                            { "name": "北京市", "value": 89800 },
+                            { "name": "天津市", "value": 56500 },
+                            { "name": "黑龙江省", "value": 37200 },
+                            { "name": "辽宁省", "value": 41300 },
+                            { "name": "吉林省", "value": 37600 },
+                            { "name": "陕西省", "value": 35800 },
+                            { "name": "内蒙古自治区", "value": 45800 },
+                            { "name": "甘肃省", "value": 27500 },
+                            { "name": "山西省", "value": 36500 },
+                            { "name": "青海省", "value": 30900 },
+                            { "name": "河北省", "value": 37300 }
+                        ],
+                        "roam": true,
+                        "aspectScale": 0.75
+                    }
+                ],
+                "timeline": {
+                    "axisType": "category",
+                    "currentIndex": 0,
+                    "orient": "horizontal",
+                    "autoPlay": true,
+                    "controlPosition": "left",
+                    "loop": true,
+                    "show": true,
+                    "playInterval": 1500,
+                    "left": "center",
+                    "bottom": "10px",
+                    "width": "80%",
+                    "data": ["2016年","2017年","2018年","2019年","2020年","2021年","2022年","2023年","2024年","2025年"]
+                },
+                "visualMap": {
+                    "show": true,
+                    "type": "piecewise",
+                    "inRange": { "color": ["#50a3ba","#eac763","#d94e5d"] },
+                    "calculable": true,
+                    "orient": "vertical",
+                    "left": "left",
+                    "bottom": "center",
+                    "pieces": [
+                        { "min": 10000, "max": 20000, "label": "1万-2万元", "color": "#E0F7FA" },
+                        { "min": 20000, "max": 30000, "label": "2万-3万元", "color": "#B2EBF2" },
+                        { "min": 30000, "max": 40000, "label": "3万-4万元", "color": "#80DEEA" },
+                        { "min": 40000, "max": 50000, "label": "4万-5万元", "color": "#4DD0E1" },
+                        { "min": 50000, "max": 70000, "label": "5万-7万元", "color": "#26C6DA" },
+                        { "min": 70000, "label": "7万元以上", "color": "#006064" }
+                    ]
+                }
+            },
+            "options": [
+                {
+                    "series": [{
+                        "type": "map", "map": "china", "name": "2016年人均可支配收入",
+                        "data": [
+                            { "name": "北京市", "value": 52530 },{ "name": "山西省", "value": 19049 },
+                            { "name": "宁夏回族自治区", "value": 18832 },{ "name": "青海省", "value": 17302 },
+                            { "name": "内蒙古自治区", "value": 24127 },{ "name": "黑龙江省", "value": 22199 },
+                            { "name": "吉林省", "value": 22726 },{ "name": "辽宁省", "value": 26040 },
+                            { "name": "甘肃省", "value": 14670 },{ "name": "福建省", "value": 27608 },
+                            { "name": "山东省", "value": 24685 },{ "name": "陕西省", "value": 18874 },
+                            { "name": "浙江省", "value": 38529 },{ "name": "西藏自治区", "value": 13639 },
+                            { "name": "江苏省", "value": 32070 },{ "name": "上海市", "value": 54305 },
+                            { "name": "安徽省", "value": 19998 },{ "name": "江西省", "value": 20110 },
+                            { "name": "海南省", "value": 20653 },{ "name": "新疆维吾尔自治区", "value": 18355 },
+                            { "name": "重庆市", "value": 22034 },{ "name": "天津市", "value": 34074 },
+                            { "name": "河北省", "value": 19725 },{ "name": "广西壮族自治区", "value": 18305 },
+                            { "name": "广东省", "value": 30296 },{ "name": "四川省", "value": 18808 },
+                            { "name": "云南省", "value": 16720 },{ "name": "湖南省", "value": 21115 },
+                            { "name": "湖北省", "value": 21787 },{ "name": "河南省", "value": 17116 },
+                            { "name": "贵州省", "value": 15121 }
+                        ]
+                    }],
+                    "title": [{ "text": "全国各省份2016年人均可支配收入地理分布", "left": "center", "textStyle": { "color": "#fff" } }],
+                    "tooltip": { "formatter": "{b}<br/>人均可支配收入：{c} 元" }
+                },
+                {
+                    "series": [{
+                        "type": "map", "map": "china", "name": "2017年人均可支配收入",
+                        "data": [
+                            { "name": "浙江省", "value": 42046 },{ "name": "上海市", "value": 58988 },
+                            { "name": "江苏省", "value": 35024 },{ "name": "福建省", "value": 30048 },
+                            { "name": "安徽省", "value": 21863 },{ "name": "江西省", "value": 22031 },
+                            { "name": "山东省", "value": 26930 },{ "name": "新疆维吾尔自治区", "value": 19975 },
+                            { "name": "天津市", "value": 37022 },{ "name": "贵州省", "value": 16704 },
+                            { "name": "云南省", "value": 18348 },{ "name": "河南省", "value": 19422 },
+                            { "name": "湖北省", "value": 23757 },{ "name": "河北省", "value": 21484 },
+                            { "name": "重庆市", "value": 24153 },{ "name": "广东省", "value": 33003 },
+                            { "name": "四川省", "value": 20580 },{ "name": "广西壮族自治区", "value": 19905 },
+                            { "name": "海南省", "value": 22553 },{ "name": "湖南省", "value": 23103 },
+                            { "name": "吉林省", "value": 24283 },{ "name": "内蒙古自治区", "value": 26212 },
+                            { "name": "青海省", "value": 19001 },{ "name": "陕西省", "value": 20635 },
+                            { "name": "西藏自治区", "value": 15457 },{ "name": "辽宁省", "value": 27835 },
+                            { "name": "宁夏回族自治区", "value": 20561 },{ "name": "甘肃省", "value": 16011 },
+                            { "name": "黑龙江省", "value": 23683 },{ "name": "山西省", "value": 20420 },
+                            { "name": "北京市", "value": 57230 }
+                        ]
+                    }],
+                    "title": [{ "text": "全国各省份2017年人均可支配收入地理分布", "left": "center", "textStyle": { "color": "#fff" } }],
+                    "tooltip": { "formatter": "{b}<br/>人均可支配收入：{c} 元" }
+                },
+                {
+                    "series": [{
+                        "type": "map", "map": "china", "name": "2018年人均可支配收入",
+                        "data": [
+                            { "name": "甘肃省", "value": 17488 },{ "name": "上海市", "value": 64183 },
+                            { "name": "四川省", "value": 22461 },{ "name": "广东省", "value": 35810 },
+                            { "name": "海南省", "value": 24579 },{ "name": "广西壮族自治区", "value": 21624 },
+                            { "name": "湖北省", "value": 25815 },{ "name": "湖南省", "value": 25241 },
+                            { "name": "内蒙古自治区", "value": 28376 },{ "name": "青海省", "value": 20757 },
+                            { "name": "安徽省", "value": 23984 },{ "name": "福建省", "value": 32644 },
+                            { "name": "山东省", "value": 29205 },{ "name": "江西省", "value": 24080 },
+                            { "name": "浙江省", "value": 45840 },{ "name": "西藏自治区", "value": 17286 },
+                            { "name": "江苏省", "value": 38096 },{ "name": "黑龙江省", "value": 25294 },
+                            { "name": "北京市", "value": 62361 },{ "name": "山西省", "value": 21990 },
+                            { "name": "河北省", "value": 23446 },{ "name": "宁夏回族自治区", "value": 22400 },
+                            { "name": "吉林省", "value": 25975 },{ "name": "陕西省", "value": 22528 },
+                            { "name": "辽宁省", "value": 29701 },{ "name": "河南省", "value": 21964 },
+                            { "name": "重庆市", "value": 26386 },{ "name": "云南省", "value": 20084 },
+                            { "name": "天津市", "value": 39506 },{ "name": "新疆维吾尔自治区", "value": 21500 },
+                            { "name": "贵州省", "value": 18430 }
+                        ]
+                    }],
+                    "title": [{ "text": "全国各省份2018年人均可支配收入地理分布", "left": "center", "textStyle": { "color": "#fff" } }],
+                    "tooltip": { "formatter": "{b}<br/>人均可支配收入：{c} 元" }
+                },
+                {
+                    "series": [{
+                        "type": "map", "map": "china", "name": "2019年人均可支配收入",
+                        "data": [
+                            { "name": "重庆市", "value": 28920 },{ "name": "广东省", "value": 39014 },
+                            { "name": "广西壮族自治区", "value": 23328 },{ "name": "江西省", "value": 26262 },
+                            { "name": "山东省", "value": 31597 },{ "name": "安徽省", "value": 26415 },
+                            { "name": "浙江省", "value": 49899 },{ "name": "西藏自治区", "value": 19501 },
+                            { "name": "江苏省", "value": 41400 },{ "name": "上海市", "value": 69442 },
+                            { "name": "黑龙江省", "value": 27159 },{ "name": "内蒙古自治区", "value": 30555 },
+                            { "name": "福建省", "value": 35616 },{ "name": "辽宁省", "value": 31820 },
+                            { "name": "山西省", "value": 23826 },{ "name": "北京市", "value": 67756 },
+                            { "name": "青海省", "value": 22618 },{ "name": "新疆维吾尔自治区", "value": 23103 },
+                            { "name": "天津市", "value": 42404 },{ "name": "云南省", "value": 22082 },
+                            { "name": "湖北省", "value": 28319 },{ "name": "贵州省", "value": 20397 },
+                            { "name": "湖南省", "value": 27680 },{ "name": "河南省", "value": 24810 },
+                            { "name": "四川省", "value": 24718 },{ "name": "海南省", "value": 26918 },
+                            { "name": "吉林省", "value": 27975 },{ "name": "甘肃省", "value": 19139 },
+                            { "name": "陕西省", "value": 24666 },{ "name": "宁夏回族自治区", "value": 24412 },
+                            { "name": "河北省", "value": 25665 }
+                        ]
+                    }],
+                    "title": [{ "text": "全国各省份2019年人均可支配收入地理分布", "left": "center", "textStyle": { "color": "#fff" } }],
+                    "tooltip": { "formatter": "{b}<br/>人均可支配收入：{c} 元" }
+                },
+                {
+                    "series": [{
+                        "type": "map", "map": "china", "name": "2020年人均可支配收入",
+                        "data": [
+                            { "name": "福建省", "value": 40659 },{ "name": "山东省", "value": 35883 },
+                            { "name": "西藏自治区", "value": 24950 },{ "name": "江苏省", "value": 47498 },
+                            { "name": "江西省", "value": 30610 },{ "name": "安徽省", "value": 30904 },
+                            { "name": "天津市", "value": 47659 },{ "name": "宁夏回族自治区", "value": 27904 },
+                            { "name": "上海市", "value": 76437 },{ "name": "黑龙江省", "value": 29191 },
+                            { "name": "辽宁省", "value": 35112 },{ "name": "浙江省", "value": 57541 },
+                            { "name": "山西省", "value": 27426 },{ "name": "北京市", "value": 75602 },
+                            { "name": "河北省", "value": 29383 },{ "name": "甘肃省", "value": 22066 },
+                            { "name": "吉林省", "value": 30578 },{ "name": "内蒙古自治区", "value": 35670 },
+                            { "name": "青海省", "value": 25919 },{ "name": "陕西省", "value": 28568 },
+                            { "name": "云南省", "value": 25666 },{ "name": "河南省", "value": 29588 },
+                            { "name": "湖北省", "value": 32158 },{ "name": "贵州省", "value": 23996 },
+                            { "name": "海南省", "value": 30457 },{ "name": "广东省", "value": 44993 },
+                            { "name": "广西壮族自治区", "value": 26727 },{ "name": "重庆市", "value": 33803 },
+                            { "name": "四川省", "value": 29080 },{ "name": "湖南省", "value": 31993 },
+                            { "name": "新疆维吾尔自治区", "value": 26075 }
+                        ]
+                    }],
+                    "title": [{ "text": "全国各省份2020年人均可支配收入地理分布", "left": "center", "textStyle": { "color": "#fff" } }],
+                    "tooltip": { "formatter": "{b}<br/>人均可支配收入：{c} 元" }
+                },
+                {
+                    "series": [{
+                        "type": "map", "map": "china", "name": "2021年人均可支配收入",
+                        "data": [
+                            { "name": "天津市", "value": 47449 },{ "name": "贵州省", "value": 23996 },
+                            { "name": "宁夏回族自治区", "value": 27904 },{ "name": "新疆维吾尔自治区", "value": 26075 },
+                            { "name": "山东省", "value": 35731 },{ "name": "甘肃省", "value": 22066 },
+                            { "name": "陕西省", "value": 28568 },{ "name": "吉林省", "value": 30479 },
+                            { "name": "山西省", "value": 27134 },{ "name": "河南省", "value": 29188 },
+                            { "name": "广东省", "value": 44993 },{ "name": "广西壮族自治区", "value": 26727 },
+                            { "name": "海南省", "value": 30457 },{ "name": "四川省", "value": 29080 },
+                            { "name": "重庆市", "value": 33803 },{ "name": "湖南省", "value": 31993 },
+                            { "name": "云南省", "value": 25666 },{ "name": "安徽省", "value": 30904 },
+                            { "name": "福建省", "value": 40659 },{ "name": "江西省", "value": 30610 },
+                            { "name": "湖北省", "value": 32158 },{ "name": "西藏自治区", "value": 24950 },
+                            { "name": "江苏省", "value": 47456 },{ "name": "上海市", "value": 78027 },
+                            { "name": "青海省", "value": 25919 },{ "name": "河北省", "value": 29188 },
+                            { "name": "北京市", "value": 75002 },{ "name": "内蒙古自治区", "value": 35184 },
+                            { "name": "辽宁省", "value": 34993 },{ "name": "黑龙江省", "value": 29051 },
+                            { "name": "浙江省", "value": 57541 }
+                        ]
+                    }],
+                    "title": [{ "text": "全国各省份2021年人均可支配收入地理分布", "left": "center", "textStyle": { "color": "#fff" } }],
+                    "tooltip": { "formatter": "{b}<br/>人均可支配收入：{c} 元" }
+                },
+                {
+                    "series": [{
+                        "type": "map", "map": "china", "name": "2022年人均可支配收入",
+                        "data": [
+                            { "name": "青海省", "value": 27000 },{ "name": "山西省", "value": 29178 },
+                            { "name": "辽宁省", "value": 36089 },{ "name": "吉林省", "value": 31975 },
+                            { "name": "陕西省", "value": 30116 },{ "name": "甘肃省", "value": 23273 },
+                            { "name": "山东省", "value": 37560 },{ "name": "江西省", "value": 32419 },
+                            { "name": "福建省", "value": 42696 },{ "name": "安徽省", "value": 32745 },
+                            { "name": "浙江省", "value": 60302 },{ "name": "江苏省", "value": 49867 },
+                            { "name": "云南省", "value": 27400 },{ "name": "西藏自治区", "value": 26675 },
+                            { "name": "上海市", "value": 82429 },{ "name": "黑龙江省", "value": 30945 },
+                            { "name": "河北省", "value": 30867 },{ "name": "内蒙古自治区", "value": 37404 },
+                            { "name": "湖南省", "value": 34036 },{ "name": "贵州省", "value": 25508 },
+                            { "name": "河南省", "value": 31075 },{ "name": "湖北省", "value": 34045 },
+                            { "name": "广西壮族自治区", "value": 28500 },{ "name": "广东省", "value": 47065 },
+                            { "name": "重庆市", "value": 35666 },{ "name": "四川省", "value": 30933 },
+                            { "name": "天津市", "value": 48976 },{ "name": "北京市", "value": 77415 },
+                            { "name": "海南省", "value": 32450 },{ "name": "宁夏回族自治区", "value": 29300 },
+                            { "name": "新疆维吾尔自治区", "value": 27300 }
+                        ]
+                    }],
+                    "title": [{ "text": "全国各省份2022年人均可支配收入地理分布", "left": "center", "textStyle": { "color": "#fff" } }],
+                    "tooltip": { "formatter": "{b}<br/>人均可支配收入：{c} 元" }
+                },
+                {
+                    "series": [{
+                        "type": "map", "map": "china", "name": "2023年人均可支配收入",
+                        "data": [
+                            { "name": "新疆维吾尔自治区", "value": 28600 },{ "name": "宁夏回族自治区", "value": 30800 },
+                            { "name": "北京市", "value": 81518 },{ "name": "天津市", "value": 51486 },
+                            { "name": "海南省", "value": 34650 },{ "name": "四川省", "value": 32903 },
+                            { "name": "广东省", "value": 49351 },{ "name": "广西壮族自治区", "value": 30475 },
+                            { "name": "重庆市", "value": 37710 },{ "name": "湖南省", "value": 36299 },
+                            { "name": "福建省", "value": 44942 },{ "name": "江西省", "value": 34436 },
+                            { "name": "山东省", "value": 39664 },{ "name": "贵州省", "value": 27200 },
+                            { "name": "河南省", "value": 33163 },{ "name": "湖北省", "value": 36145 },
+                            { "name": "安徽省", "value": 34885 },{ "name": "浙江省", "value": 63348 },
+                            { "name": "云南省", "value": 29300 },{ "name": "西藏自治区", "value": 28500 },
+                            { "name": "江苏省", "value": 52548 },{ "name": "甘肃省", "value": 24600 },
+                            { "name": "河北省", "value": 32935 },{ "name": "山西省", "value": 31545 },
+                            { "name": "内蒙古自治区", "value": 40085 },{ "name": "青海省", "value": 28200 },
+                            { "name": "辽宁省", "value": 37725 },{ "name": "吉林省", "value": 33800 },
+                            { "name": "陕西省", "value": 31900 },{ "name": "上海市", "value": 87000 },
+                            { "name": "黑龙江省", "value": 33000 }
+                        ]
+                    }],
+                    "title": [{ "text": "全国各省份2023年人均可支配收入地理分布", "left": "center", "textStyle": { "color": "#fff" } }],
+                    "tooltip": { "formatter": "{b}<br/>人均可支配收入：{c} 元" }
+                },
+                {
+                    "series": [{
+                        "type": "map", "map": "china", "name": "2024年人均可支配收入",
+                        "data": [
+                            { "name": "四川省", "value": 35000 },{ "name": "江苏省", "value": 55400 },
+                            { "name": "云南省", "value": 31300 },{ "name": "浙江省", "value": 66600 },
+                            { "name": "安徽省", "value": 37200 },{ "name": "西藏自治区", "value": 30500 },
+                            { "name": "江西省", "value": 36600 },{ "name": "贵州省", "value": 29000 },
+                            { "name": "河南省", "value": 35400 },{ "name": "福建省", "value": 47400 },
+                            { "name": "山东省", "value": 41900 },{ "name": "广东省", "value": 51800 },
+                            { "name": "北京市", "value": 85620 },{ "name": "内蒙古自治区", "value": 42900 },
+                            { "name": "山西省", "value": 34000 },{ "name": "河北省", "value": 35100 },
+                            { "name": "甘肃省", "value": 26000 },{ "name": "上海市", "value": 91800 },
+                            { "name": "陕西省", "value": 33800 },{ "name": "吉林省", "value": 35700 },
+                            { "name": "辽宁省", "value": 39500 },{ "name": "青海省", "value": 29500 },
+                            { "name": "黑龙江省", "value": 35100 },{ "name": "湖南省", "value": 38700 },
+                            { "name": "广西壮族自治区", "value": 32600 },{ "name": "湖北省", "value": 38400 },
+                            { "name": "重庆市", "value": 39900 },{ "name": "宁夏回族自治区", "value": 32400 },
+                            { "name": "新疆维吾尔自治区", "value": 30000 },{ "name": "海南省", "value": 37000 },
+                            { "name": "天津市", "value": 54000 }
+                        ]
+                    }],
+                    "title": [{ "text": "全国各省份2024年人均可支配收入地理分布", "left": "center", "textStyle": { "color": "#fff" } }],
+                    "tooltip": { "formatter": "{b}<br/>人均可支配收入：{c} 元" }
+                },
+                {
+                    "series": [{
+                        "type": "map", "map": "china", "name": "2025年人均可支配收入",
+                        "data": [
+                            { "name": "新疆维吾尔自治区", "value": 31500 },{ "name": "宁夏回族自治区", "value": 34100 },
+                            { "name": "上海市", "value": 96800 },{ "name": "江苏省", "value": 58400 },
+                            { "name": "云南省", "value": 33400 },{ "name": "西藏自治区", "value": 32600 },
+                            { "name": "浙江省", "value": 70000 },{ "name": "安徽省", "value": 39600 },
+                            { "name": "江西省", "value": 38900 },{ "name": "福建省", "value": 50000 },
+                            { "name": "山东省", "value": 44200 },{ "name": "贵州省", "value": 30900 },
+                            { "name": "河南省", "value": 37700 },{ "name": "广东省", "value": 54400 },
+                            { "name": "四川省", "value": 37200 },{ "name": "重庆市", "value": 42200 },
+                            { "name": "湖南省", "value": 41200 },{ "name": "湖北省", "value": 40800 },
+                            { "name": "广西壮族自治区", "value": 34800 },{ "name": "海南省", "value": 39500 },
+                            { "name": "北京市", "value": 89800 },{ "name": "天津市", "value": 56500 },
+                            { "name": "黑龙江省", "value": 37200 },{ "name": "辽宁省", "value": 41300 },
+                            { "name": "吉林省", "value": 37600 },{ "name": "陕西省", "value": 35800 },
+                            { "name": "内蒙古自治区", "value": 45800 },{ "name": "甘肃省", "value": 27500 },
+                            { "name": "山西省", "value": 36500 },{ "name": "青海省", "value": 30900 },
+                            { "name": "河北省", "value": 37300 }
+                        ]
+                    }],
+                    "title": [{ "text": "全国各省份2025年人均可支配收入地理分布", "left": "center", "textStyle": { "color": "#fff" } }],
+                    "tooltip": { "formatter": "{b}<br/>人均可支配收入：{c} 元" }
+                }
+            ]
+        };
+        chart3.setOption(option_chart3);
+
+        // ==================== chart4 城市人口规模等级分布（饼图） ====================
+var chart4Option = {
+  backgroundColor: 'transparent',
+  title: {
+    text: '2025年省份常住人口规模等级分布',
+    left: 'center',
+    textStyle: {
+      color: '#00f0ff',
+      fontSize: 13
+    }
+  },
+  tooltip: {
+    trigger: 'item',
+    backgroundColor: 'rgba(10,25,41,0.9)',
+    textStyle: { color: '#fff' },
+    formatter: '{b}: {c}个 ({d}%)'
+  },
+  legend: {
+    orient: 'vertical',
+    left: 'left',
+    top: 'center',
+    textStyle: {
+      color: '#00f0ff',
+      fontSize: 11
+    }
+  },
+  series: [
+    {
+      type: 'pie',
+      name: '省份数量',
+      radius: ['35%', '70%'],
+      center: ['60%', '50%'],
+      avoidLabelOverlap: true,
+      label: {
+        show: true,
+        formatter: '{b}: {c}个 ({d}%)',
+        color: '#fff',
+        fontSize: 10
+      },
+      labelLine: {
+        lineStyle: {
+          color: '#00f0ff'
+        }
+      },
+      itemStyle: {
+        color: function (params) {
+          var colorList = [
+            '#00f0ff', '#0066ff', '#00ccff', '#0099ff'
+          ];
+          return colorList[params.dataIndex];
+        }
+      },
+      data: [
+        { name: '中型省份', value: 15 },
+        { name: '大型省份', value: 7 },
+        { name: '小型省份', value: 5 },
+        { name: '超大型省份', value: 4 }
+      ]
+    }
+  ]
+};
+chart4.setOption(chart4Option);
+
+// ==================== 收入消费散点图 ====================
+var chart5Option = {
+  backgroundColor: 'transparent',
+  title: {
+    text: "收入与消费支出关系",
+    left: "center",
+    textStyle: {
+      color: '#00f0ff',
+      fontSize: 13
+    }
+  },
+  tooltip: {
+    show: true,
+    trigger: "item",
+    backgroundColor: 'rgba(10,25,41,0.9)',
+    textStyle: {
+      fontSize: 14,
+      color: '#fff'
+    },
+    formatter: function(params) {
+      let income = params.data[0];
+      let consume = params.data[1];
+      let rate = params.data[2];
+      return '收入：' + income.toFixed(0) + ' 元<br/>' +
+             '消费：' + consume.toFixed(0) + ' 元<br/>' +
+             '消费率：' + (rate*100).toFixed(2) + '%';
+    }
+  },
+  grid: {
+    left: '5%',
+    right: '15%',
+    bottom: '5%',
+    top: '15%',
+    containLabel: true
+  },
+  xAxis: {
+    type: 'value',
+    name: "人均可支配收入（元）",
+    nameTextStyle: { color: '#00f0ff' },
+    axisLabel: { color: '#00f0ff' },
+    axisLine: { lineStyle: { color: '#1e3a5f' } },
+    splitLine: { lineStyle: { color: '#1e3a5f' } }
+  },
+  yAxis: {
+    type: 'value',
+    name: "人均消费支出（元）",
+    nameTextStyle: { color: '#00f0ff' },
+    axisLabel: { color: '#00f0ff' },
+    axisLine: { lineStyle: { color: '#1e3a5f' } },
+    splitLine: { lineStyle: { color: '#1e3a5f' } }
+  },
+  visualMap: {
+    show: true,
+    type: 'continuous',
+    min: 0.5756577702063221,
+    max: 0.8603174603174604,
+    text: ["86.0%", "57.6%"],
+    inRange: {
+      color: ["#457B9D","#A8DADC","#F1FAEE","#E63946"]
+    },
+    calculable: true,
+    dimension: 2,
+    orient: "vertical",
+    right: '2%',
+    top: 'center',
+    textStyle: { color: '#00f0ff' }
+  },
+  series: [
+    {
+      name: "收入-消费",
+      type: 'scatter',
+      symbolSize: 14,
+      itemStyle: { opacity: 0.85 },
+      data: [
+        [52530.0,35416.0,0.6742052160670093],[57230.0,37425.0,0.6539402411322733],[62361.0,42926.0,0.6883468834688347],[67756.0,45331.0,0.6690330007674598],[75602.0,48903.0,0.6468479669850004],[75002.0,51711.0,0.6894616143569505],[77415.0,52030.0,0.6720919718400826],[81518.0,55755.0,0.6839593709364803],[85620.0,58920.0,0.6881569726699369],[89800.0,62150.0,0.6920935412026726],
+        [34074.0,23232.0,0.6818101778482127],[37022.0,25445.0,0.6872940413808006],[39506.0,27841.0,0.7047283956867312],[42404.0,29903.0,0.7051929063295915],[47659.0,33884.0,0.7109674982689523],[47449.0,34811.0,0.7336508672469388],[48976.0,35876.0,0.7325220516171186],[51486.0,37654.0,0.731344443149594],[54000.0,39500.0,0.7314814814814815],[56500.0,41400.0,0.7327433628318584],
+        [19725.0,12881.0,0.6530291508238276],[21484.0,14034.0,0.6532303109290635],[23446.0,15437.0,0.6584065512240894],[25665.0,16782.0,0.6538866160140269],[29383.0,19398.0,0.660177653745363],[29188.0,19811.0,0.6787378374674524],[30867.0,20954.0,0.678847960605177],[32935.0,22385.0,0.6796720813724002],[35100.0,23900.0,0.6809116809116809],[37300.0,25500.0,0.6836461126005362],
+        [19049.0,11546.0,0.6061210562234238],[20420.0,12212.0,0.5980411361410382],[21990.0,13166.0,0.5987266939517962],[23826.0,14247.0,0.5979602115336188],[27426.0,16538.0,0.6030044483336979],[27134.0,17111.0,0.6306110414977519],[29178.0,18245.0,0.6252998834738501],[31545.0,19585.0,0.6208590901886194],[34000.0,21000.0,0.6176470588235294],[36500.0,22500.0,0.6164383561643836],
+        [24127.0,18072.0,0.7490363493181912],[26212.0,19665.0,0.7502289027926141],[28376.0,21352.0,0.7524668734141529],[30555.0,23638.0,0.7736213385697922],[35670.0,26864.0,0.7531258760863471],[35184.0,27885.0,0.7925477489768077],[37404.0,29675.0,0.793364346059245],[40085.0,31585.0,0.7879506049644506],[42900.0,33600.0,0.7832167832167832],[45800.0,35700.0,0.7794759825327511],
+        [26040.0,19853.0,0.7624039938556068],[27835.0,21398.0,0.7687443865636788],[29701.0,22996.0,0.7742500252516751],[31820.0,24442.0,0.7681332495285984],[35112.0,27299.0,0.7774834814308499],[34993.0,28411.0,0.8119052381904952],[36089.0,29876.0,0.8278422788107179],[37725.0,31454.0,0.8337707090788602],[39500.0,33100.0,0.8379746835443038],[41300.0,34800.0,0.8426150121065376],
+        [22726.0,16796.0,0.739065387661709],[24283.0,17886.0,0.7365646748754272],[25975.0,19058.0,0.7337054860442733],[27975.0,20412.0,0.7296514745308311],[30578.0,22394.0,0.7323565962456668],[30479.0,23611.0,0.7746645231142754],[31975.0,24876.0,0.777982799061767],[33800.0,26254.0,0.7767455621301775],[35700.0,27700.0,0.7759103641456583],[37600.0,29200.0,0.776595744680851],
+        [22199.0,16467.0,0.7417901707284111],[23683.0,17404.0,0.7348731157370265],[25294.0,18446.0,0.7292638570411956],[27159.0,19684.0,0.724768953201517],[29191.0,21684.0,0.7428316947004213],[29051.0,22811.0,0.7852053285601184],[30945.0,24076.0,0.778025529164647],[33000.0,25454.0,0.7713333333333333],[35100.0,26900.0,0.7663817663817664],[37200.0,28400.0,0.7634408602150538],
+        [54305.0,37458.0,0.689770739342602],[58988.0,39792.0,0.6745778802468299],[64183.0,43351.0,0.6754280728541826],[69442.0,45605.0,0.6567351170761211],[76437.0,48272.0,0.6315266166908696],[78027.0,51295.0,0.6574006433670396],[82429.0,53300.0,0.6466170886459862],[87000.0,55600.0,0.639080459770115],[91800.0,58000.0,0.6318082788671024],[96800.0,60500.0,0.625],
+        [32070.0,22130.0,0.690053009042719],[35024.0,23469.0,0.6700833714024669],[38096.0,25007.0,0.6564206215875682],[41400.0,26697.0,0.6448550724637682],[47498.0,30145.0,0.6346583014021643],[47456.0,31385.0,0.6613494605529332],[49867.0,32845.0,0.6586520143581928],[52548.0,34454.0,0.6556671995128264],[55400.0,36200.0,0.6534296028880866],[58400.0,38000.0,0.6506849315068494],
+        [38529.0,25527.0,0.6625399050066184],[42046.0,27079.0,0.6440327260619322],[45840.0,29471.0,0.6429101221640489],[49899.0,32026.0,0.6418164692679212],[57541.0,36197.0,0.629064493144019],[57541.0,37385.0,0.6497106411080794],[60302.0,38945.0,0.645832642366754],[63348.0,40654.0,0.6417566458293869],[66600.0,42500.0,0.6381381381381381],[70000.0,44500.0,0.6357142857142857],
+        [19998.0,11629.0,0.5815081508150816],[21863.0,12748.0,0.5830855783744225],[23984.0,13967.0,0.5823465643762509],[26415.0,15206.0,0.5756577702063221],[30904.0,17964.0,0.5812839761843127],[30904.0,19285.0,0.6240292518767797],[32745.0,20545.0,0.6274240342036952],[34885.0,21954.0,0.629324924752759],[37200.0,23500.0,0.6317204301075269],[39600.0,25100.0,0.6338383838383839],
+        [27608.0,19859.0,0.7193204868154158],[30048.0,21249.0,0.7071685303514377],[32644.0,22866.0,0.7004656292121063],[35616.0,24618.0,0.6912061994609164],[40659.0,28145.0,0.6922206645515138],[40659.0,29385.0,0.7227182173688482],[42696.0,30745.0,0.7200908750234214],[44942.0,32254.0,0.7176805660629255],[47400.0,33900.0,0.7151898734177216],[50000.0,35600.0,0.712],
+        [20110.0,11851.0,0.5893088015912481],[22031.0,12998.0,0.5899868367300621],[24080.0,14257.0,0.5920681063122923],[26262.0,15636.0,0.5953849668722869],[30610.0,18294.0,0.5976478275073506],[30610.0,19585.0,0.6398235870630513],[32419.0,20845.0,0.6429871371726457],[34436.0,22254.0,0.6462423045649901],[36600.0,23800.0,0.6502732240437158],[38900.0,25400.0,0.6529562982005142],
+        [24685.0,14798.0,0.5994733643913308],[26930.0,15972.0,0.5930932046045303],[29205.0,17281.0,0.5917137476459511],[31597.0,18745.0,0.593252523973795],[35883.0,21495.0,0.5990301814229579],[35731.0,22611.0,0.6328118440569813],[37560.0,23876.0,0.6356762513312034],[39664.0,25254.0,0.6366982654296087],[41900.0,26700.0,0.6372315035799523],[44200.0,28200.0,0.6380090497737556],
+        [17116.0,11720.0,0.6847394250993223],[19422.0,13730.0,0.7069302852435383],[21964.0,15437.0,0.7028319067565106],[24810.0,16782.0,0.6764207980652962],[29588.0,19398.0,0.6556036230904421],[29188.0,19811.0,0.6787378374674524],[31075.0,20954.0,0.6743041029766693],[33163.0,22385.0,0.6749992461478154],[35400.0,23900.0,0.6751412429378532],[37700.0,25500.0,0.6763925729442971],
+        [21787.0,14496.0,0.6653508973240924],[23757.0,15752.0,0.663046680978238],[25815.0,17195.0,0.6660856091419717],[28319.0,18684.0,0.6597690596419366],[32158.0,21294.0,0.6621680452764476],[32158.0,22411.0,0.6969027924622178],[34045.0,23676.0,0.6954325157879278],[36145.0,25054.0,0.693152579886568],[38400.0,26500.0,0.6901041666666666],[40800.0,28000.0,0.6862745098039216],
+        [21115.0,13969.0,0.6615676059673218],[23103.0,15111.0,0.654070899883132],[25241.0,16405.0,0.6499346301652074],[27680.0,17796.0,0.6429190751445086],[31993.0,20194.0,0.6312005751258087],[31993.0,21311.0,0.6661144625386803],[34036.0,22576.0,0.6632976848043248],[36299.0,23954.0,0.6599079864459076],[38700.0,25400.0,0.6563307493540051],[41200.0,26900.0,0.6529126213592233],
+        [30296.0,22172.0,0.7318457882228677],[33003.0,23996.0,0.72708541647729],[35810.0,26054.0,0.7275621334822675],[39014.0,28240.0,0.7238427231250321],[44993.0,32034.0,0.7119774187095771],[44993.0,33185.0,0.7375591758718023],[47065.0,34445.0,0.7318601933496228],[49351.0,35854.0,0.7265101011124394],[51800.0,37400.0,0.722007722007722],[54400.0,39000.0,0.7169117647058824]
+      ]
+    }
+  ]
+};
+chart5.setOption(chart5Option);
+
+        // ==================== chart6 居民收支趋势面积图 ====================
+var chart6Option = {
+    backgroundColor: 'transparent',
+    tooltip: {
+        trigger: "axis",
+        textStyle: { color: '#fff' },
+        backgroundColor: 'rgba(10,25,41,0.9)',
+        formatter: "{b}年<br/>{a0}：{c0} 元<br/>{a1}：{c1} 元"
+    },
+    legend: {
+        data: ["人均可支配收入", "人均消费支出"],
+        top: 5,
+        textStyle: { color: '#00f0ff', fontSize: 12 }
+    },
+    grid: {
+        left: '3%', right: '4%', bottom: '3%', containLabel: true
+    },
+    xAxis: {
+        name: "年份",
+        type: "category",
+        data: ["2016","2017","2018","2019","2020","2021","2022","2023","2024","2025"],
+        axisLine: { lineStyle: { color: '#1e3a5f' } },
+        axisLabel: { color: '#00f0ff' }
+    },
+    yAxis: {
+        name: "金额（元）",
+        type: "value",
+        axisLine: { lineStyle: { color: '#1e3a5f' } },
+        axisLabel: { color: '#00f0ff' }
+    },
+    series: [
+        {
+            name: "人均可支配收入",
+            type: "line",
+            smooth: true,
+            symbolSize: 5,
+            label: { show: true, color: '#fff', fontSize: 10 },
+            areaStyle: {
+                opacity: 0.5,
+                color: new echarts.graphic.LinearGradient(0,0,0,1,[
+                    {offset:0,color:'#0066ff'},{offset:1,color:'#00f0ff'}
+                ])
+            },
+            lineStyle: { width: 2, color: '#00f0ff' },
+            data: [23916.19,26073.13,28355.94,30884.39,35293.42,35256.48,37135.77,39313.32,41616.77,44012.90]
+        },
+        {
+            name: "人均消费支出",
+            type: "line",
+            smooth: true,
+            symbolSize: 5,
+            label: { show: true, color: '#fff', fontSize: 10 },
+            areaStyle: {
+                opacity: 0.4,
+                color: new echarts.graphic.LinearGradient(0,0,0,1,[
+                    {offset:0,color:'#00ccff'},{offset:1,color:'#0099ff'}
+                ])
+            },
+            lineStyle: { width: 2, color: '#00ccff' },
+            data: [16483.23,17815.65,19449.13,21048.68,23836.26,25023.97,26305.55,27853.06,29465.16,31140.32]
+        }
+    ]
+};
+chart6.setOption(chart6Option);
+
+
+    </script>
+</body>
+</html>
